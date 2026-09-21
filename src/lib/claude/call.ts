@@ -28,7 +28,6 @@ export interface CallOptions<T> {
    * returned pre-parsed — no "please reply with JSON only" prompting needed.
    */
   schema?: ZodType<T>;
-  schemaName?: string;
   /** Overrides for the task defaults in models.ts. */
   maxTokens?: number;
   effort?: Effort;
@@ -58,7 +57,6 @@ export async function callClaude<T = never>(
     messages,
     system,
     schema,
-    schemaName,
     tools,
     cacheSystem = false,
     meta,
@@ -97,7 +95,7 @@ export async function callClaude<T = never>(
   if (schema) {
     params.output_config = {
       ...(params.output_config as object | undefined),
-      format: zodOutputFormat(schema, schemaName ?? `${task}_output`),
+      format: zodOutputFormat(schema),
     };
   }
 

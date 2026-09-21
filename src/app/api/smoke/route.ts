@@ -21,7 +21,6 @@ export async function GET() {
     const result = await callClaude({
       task: "smoke",
       schema: SmokeSchema,
-      schemaName: "smoke_check",
       system: "You are a wardrobe assistant. Answer briefly.",
       messages: [
         {
