@@ -1,12 +1,7 @@
 import { z } from "zod";
 
 import { emptyUsage, type TokenUsage } from "@/lib/ai/pricing";
-import type {
-  AiMessage,
-  AiProvider,
-  AiRequest,
-  AiResponse,
-} from "@/lib/ai/types";
+import type { AiProvider, AiRequest, AiResponse } from "@/lib/ai/types";
 
 /** Ollama's /api/chat message shape: content is a string, images sit beside it. */
 interface OllamaMessage {
