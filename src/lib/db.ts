@@ -1,17 +1,25 @@
-import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-// Next.js hot-reloads modules in dev, which would otherwise open a new pool on
-// every edit until Postgres refuses connections. Stash the client on globalThis.
+import { PrismaClient } from "@/generated/prisma/client";
+import { env } from "@/lib/env";
+
+// Prisma 7 connects through a driver adapter rather than a schema-level url.
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+function createClient(): PrismaClient {
+  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
+  return new PrismaClient({
+    adapter,
+    log: env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
+}
 
-if (process.env.NODE_ENV !== "production") {
+// Next.js hot-reloads modules in dev, which would otherwise open a new pool on
+// every edit until Postgres refuses connections. Stash the client on globalThis.
+export const prisma = globalForPrisma.prisma ?? createClient();
+
+if (env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
