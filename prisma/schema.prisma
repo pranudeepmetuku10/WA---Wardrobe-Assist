@@ -1,0 +1,273 @@
+// Wardrobe Assistant — Postgres schema.
+//
+// Single-user in v1, but every row carries `userId` so auth can be added later
+// without a migration. Scalar lists (String[], enum[]) are Postgres-native;
+// only genuinely nested shapes (colors, weather snapshots) use Json.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enums ----
+
+enum Category {
+  TOP
+  BOTTOM
+  ONE_PIECE
+  OUTERWEAR
+  FOOTWEAR
+  ACCESSORY
+  BAG
+  JEWELRY
+  HEADWEAR
+}
+
+enum Pattern {
+  SOLID
+  STRIPED
+  CHECKED
+  PRINTED
+  TEXTURED
+  EMBROIDERED
+}
+
+enum Material {
+  COTTON
+  LINEN
+  DENIM
+  WOOL
+  CASHMERE
+  SILK
+  SATIN
+  CHIFFON
+  VELVET
+  LEATHER
+  SUEDE
+  SYNTHETIC
+  POLYESTER
+  NYLON
+  RAYON
+  VISCOSE
+  KNIT
+  FLEECE
+  DOWN
+  RUBBER
+  CANVAS
+  BLEND
+  OTHER
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  MONSOON
+  AUTUMN
+  WINTER
+  ALL_SEASON
+}
+
+enum Fit {
+  SLIM
+  REGULAR
+  RELAXED
+  OVERSIZED
+}
+
+enum GarmentStatus {
+  AVAILABLE
+  IN_LAUNDRY
+  DRY_CLEAN
+  STORED
+  RETIRED
+}
+
+enum OutfitSource {
+  AI_SUGGESTED
+  USER_CREATED
+}
+
+enum FeedbackType {
+  WORN
+  SKIPPED
+  RATED
+  REGENERATED
+}
+
+// ------------------------------------------------------------- garments ----
+
+model Garment {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  imageUrl     String?
+  thumbnailUrl String?
+
+  category    Category
+  subcategory String // free text: "oxford shirt", "kurta", "chelsea boot"
+
+  /// [GarmentColors] — array of { name, hex, role: primary|secondary|accent }
+  colors    Json     @default("[]")
+  pattern   Pattern  @default(SOLID)
+  materials Material[]
+
+  formality Int // 1 loungewear .. 5 black tie
+  warmth    Int // 1 sheer/linen .. 5 heavy wool
+  seasons   Season[]
+  fit       Fit     @default(REGULAR)
+
+  styleTags       String[]
+  culturalContext String? // "Indian formal", "Indo-western"
+
+  brand      String?
+  priceCents Int? // optional, powers cost-per-wear insights
+  condition  String?
+  notes      String?
+  isFavorite Boolean @default(false)
+
+  /// Basics (plain tees, jeans) are exempt from the wear-recency filter.
+  isBasic Boolean @default(false)
+
+  status     GarmentStatus @default(AVAILABLE)
+  lastWornAt DateTime?
+  wearCount  Int           @default(0)
+
+  aiConfidence Float?
+  userVerified Boolean @default(false)
+
+  outfits OutfitGarment[]
+
+  @@index([userId, status])
+  @@index([userId, category])
+  @@index([userId, lastWornAt])
+}
+
+// -------------------------------------------------------------- outfits ----
+
+model Outfit {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  name     String?
+  occasion String
+
+  /// [WeatherSnapshot] — conditions the suggestion was made under
+  weatherSnapshot Json?
+
+  reasoning   String?
+  stylingTips String[]
+  confidence  Float?
+  isWildcard  Boolean @default(false)
+
+  /// Which Stage-A constraint (if any) had to be relaxed to produce this.
+  relaxedConstraints String[]
+
+  source       OutfitSource @default(AI_SUGGESTED)
+  rating       Int? // 1..5
+  feedbackNote String?
+  wornAt       DateTime?
+
+  garments OutfitGarment[]
+  feedback FeedbackEvent[]
+
+  @@index([userId, createdAt])
+  @@index([userId, wornAt])
+}
+
+model OutfitGarment {
+  outfitId  String
+  garmentId String
+  /// Slot this garment filled: top | bottom | one_piece | footwear | outerwear | accessory
+  role      String?
+
+  outfit  Outfit  @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  garment Garment @relation(fields: [garmentId], references: [id], onDelete: Cascade)
+
+  @@id([outfitId, garmentId])
+  @@index([garmentId])
+}
+
+// -------------------------------------------------------- style profile ----
+
+model StyleProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Location is asked at runtime rather than hardcoded; cached here once given.
+  homeCity  String?
+  latitude  Float?
+  longitude Float?
+  timezone  String?
+  units     String  @default("metric") // metric | imperial
+
+  bodyNotes           String?
+  colorsLoved         String[]
+  colorsToAvoid       String[]
+  /// [NeverPairRules] — hard user rules, e.g. [{ a: "brown shoes", b: "black trousers" }]
+  neverPair           Json     @default("[]")
+  dressCodeNotes      String?
+  freeformPreferences String?
+
+  /// [LearnedPreferences] — regenerated from feedback; user-editable in the UI
+  learnedPreferences        Json?
+  learnedPreferencesUpdated DateTime?
+
+  wearRecencyDays Int @default(7)
+}
+
+// ------------------------------------------------------------- feedback ----
+
+model FeedbackEvent {
+  id        String       @id @default(cuid())
+  userId    String
+  createdAt DateTime     @default(now())
+  type      FeedbackType
+
+  outfitId String?
+  outfit   Outfit? @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+
+  garmentIds String[]
+  occasion   String?
+  rating     Int?
+  note       String?
+
+  @@index([userId, createdAt])
+}
+
+// -------------------------------------------------------- observability ----
+
+model ModelCall {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  task  String // "extract_garment" | "recommend_outfits" | "smoke" | ...
+  model String
+
+  inputTokens         Int   @default(0)
+  outputTokens        Int   @default(0)
+  cacheCreationTokens Int   @default(0)
+  cacheReadTokens     Int   @default(0)
+  latencyMs           Int   @default(0)
+  costUsd             Float @default(0)
+
+  ok         Boolean @default(true)
+  attempts   Int     @default(1)
+  errorType  String?
+  stopReason String?
+
+  /// [ModelCallMeta] — free-form context (garmentId, occasion, candidate count)
+  meta Json?
+
+  @@index([createdAt])
+  @@index([task, createdAt])
+}

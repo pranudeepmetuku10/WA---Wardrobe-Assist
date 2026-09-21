@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. The garment photos are the interface, so the chrome stays
+ * warm-neutral and low-contrast and lets the images carry the colour.
+ */
+:root {
+  --background: #faf9f7;
+  --foreground: #1c1a17;
+  --surface: #ffffff;
+  --muted: #6f6a63;
+  --border: #e5e1db;
+  --accent: #3f6f5f;
+  --accent-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #12110f;
+    --foreground: #f2efe9;
+    --surface: #1c1a17;
+    --muted: #a09a91;
+    --border: #2e2b27;
+    --accent: #76b39c;
+    --accent-foreground: #10201b;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Respect the iOS safe area when installed to the home screen. */
+  padding-bottom: env(safe-area-inset-bottom);
+}

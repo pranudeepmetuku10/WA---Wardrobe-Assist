@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: wardrobe-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wardrobe
+      POSTGRES_PASSWORD: wardrobe
+      POSTGRES_DB: wardrobe
+    # 5433 on the host so we never collide with a local Postgres on 5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - wardrobe-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wardrobe -d wardrobe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  wardrobe-pgdata:
