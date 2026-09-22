@@ -96,6 +96,15 @@ src/lib/ai/
   providers/ollama.ts     Local models over Ollama's HTTP API
   providers/anthropic.ts  Hosted Claude
   call.ts                 callModel() — typed, retried, validated, logged
+src/lib/garments/
+  attributes.ts           Zod contract + the enum values the model may use
+  normalize.ts            Deterministic fixes for physically wrong attributes
+  persist.ts              Extraction -> Garment rows
+src/lib/images/sniff.ts   Magic-byte image type detection
+src/lib/client/image.ts   Browser resize (1024px) + batch concurrency
+src/components/           Upload queue and the editable review card
+src/app/add/              Add + review screen
+src/app/api/garments/     ingest | text | verify | list | edit | delete
 src/app/api/smoke/        Phase 0 acceptance check
 ```
 
@@ -113,10 +122,27 @@ src/app/api/smoke/        Phase 0 acceptance check
   from the same schema. Both are re-validated against the schema afterwards.
 - Every table carries `userId` so auth can be added without a data migration.
 
+## Wardrobe ingestion
+
+`/add` takes a batch of photos (drag-and-drop on desktop, camera on mobile),
+resizes each to 1024px client-side, and runs them through extraction three at a
+time. One failure never loses the batch. Items come back as unverified drafts
+and stay that way until you confirm them, so nothing enters the wardrobe on the
+model's say-so.
+
+Two things the model is reliably bad at locally, both handled in code rather
+than by prompting:
+
+- **Physically impossible attributes** — a linen blazer rated warmth 4 and
+  tagged for winter. `normalize.ts` clamps warmth to what the fabric allows and
+  strips contradictory seasons. This matters because Stage A scores weather fit
+  from exactly those fields.
+- **Pairs counted twice** — a photo of shoes returning two FOOTWEAR items.
+
 ## Status
 
 - [x] **Phase 0** — scaffold, schema, storage, provider-pluggable AI wrapper, smoke test
-- [ ] **Phase 1** — ingestion, vision extraction, review screen
+- [x] **Phase 1** — ingestion, vision extraction, review screen
 - [ ] **Phase 2** — filtering engine, recommendation call, weather tool
 - [ ] **Phase 3** — full UI
 - [ ] **Phase 4** — learning loop, insights, eval harness

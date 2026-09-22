@@ -139,7 +139,9 @@ model Garment {
   wearCount  Int           @default(0)
 
   aiConfidence Float?
-  userVerified Boolean @default(false)
+  /// [FieldConfidence] — per-field 0-1 self-assessment from extraction
+  fieldConfidence Json?
+  userVerified    Boolean @default(false)
 
   outfits OutfitGarment[]
 

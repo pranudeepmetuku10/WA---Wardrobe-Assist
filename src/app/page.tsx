@@ -21,16 +21,16 @@ export default function Home() {
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium">Phase 0 — scaffold</h2>
+          <h2 className="text-sm font-medium">Build your wardrobe</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>Postgres schema, storage adapter, and Claude wrapper in place.</li>
-            <li>Ingestion, the recommendation engine, and the UI come next.</li>
+            <li>Photograph a batch, or describe items in words.</li>
+            <li>Everything is read locally — no photos leave this machine.</li>
           </ul>
           <Link
-            href="/api/smoke"
+            href="/add"
             className="mt-5 inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-medium text-accent-foreground"
           >
-            Run the Claude smoke test
+            Add clothes
           </Link>
         </div>
 
