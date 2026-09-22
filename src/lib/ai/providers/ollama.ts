@@ -49,9 +49,11 @@ export class OllamaProvider implements AiProvider {
     if (request.schema) {
       body.format = z.toJSONSchema(request.schema, { io: "output" });
     }
-    // Thinking models emit a separate `thinking` field; keep it off unless the
-    // task wants it, because it roughly doubles local latency.
-    body.think = request.thinking === true;
+    // Thinking models emit a separate `thinking` field before the answer.
+    // Combined with a grammar it is a trap: the model reasons until it hits
+    // num_predict and the constrained JSON never arrives, so the call takes
+    // minutes and returns nothing. Structured output therefore forces it off.
+    body.think = request.thinking === true && !request.schema;
 
     let response: Response;
     try {

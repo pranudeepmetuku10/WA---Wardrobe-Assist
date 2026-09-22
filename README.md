@@ -105,6 +105,16 @@ src/lib/client/image.ts   Browser resize (1024px) + batch concurrency
 src/components/           Upload queue and the editable review card
 src/app/add/              Add + review screen
 src/app/api/garments/     ingest | text | verify | list | edit | delete
+src/lib/rules/
+  occasions.ts            Occasion -> formality window (edit this freely)
+  color.ts                HSL, neutral detection, harmony, pattern clashes
+  weather.ts              Warmth targets, breathability, the hot/cold veto
+  filter.ts               Stage A: who is eligible today, and how well they fit
+  combine.ts              Stage A: build and pre-score whole outfits
+src/lib/weather/          Open-Meteo geocoding + forecast, cached hourly
+src/lib/ai/recommend.ts   Stage B: the model ranks pre-validated outfits
+src/lib/recommend/        The pipeline, including the relaxation ladder
+src/app/api/recommend/    POST an occasion, get three outfits
 src/app/api/smoke/        Phase 0 acceptance check
 ```
 
@@ -139,11 +149,49 @@ than by prompting:
   from exactly those fields.
 - **Pairs counted twice** — a photo of shoes returning two FOOTWEAR items.
 
+## How a recommendation is made
+
+Two stages, and the split is the whole design:
+
+**Stage A is deterministic TypeScript** (`src/lib/rules/`). It picks who is
+eligible — available, in season, in the occasion's formality window, not worn
+too recently — scores what survives against the weather, assembles complete
+outfits, and pre-scores them on colour harmony and formality coherence. Only
+the best ~40 go any further.
+
+**Stage B is the model.** It receives those pre-validated outfits as short ids
+(`c1`, `c2`, ...) and ranks three of them with reasoning. It cannot assemble an
+outfit, cannot name a garment you don't own, and a pick referencing an unknown
+id is rejected and retried. Short ids are both cheaper in tokens and harder to
+hallucinate than database ids.
+
+Two rules are deliberately *not* negotiable by the model:
+
+- **The weather veto.** A garment more than two warmth steps above what the
+  temperature calls for is removed, not merely down-scored. Scoring alone let
+  wool trousers reach the model at 32C, and it wrote a confident paragraph
+  justifying them. It is excluded from the relaxation ladder: if nothing in the
+  wardrobe suits the weather, the honest answer is to say so.
+- **Accessory coherence.** An accessory is re-scored as part of the outfit, and
+  neckwear needs a collar to sit on.
+
+When Stage A cannot find three viable outfits it relaxes constraints in a fixed
+order — recency, then formality by one step, then season — and reports which,
+so the UI can tell you why today's suggestions look unusual.
+
+```bash
+curl -s localhost:3000/api/recommend -X POST -H 'Content-Type: application/json' \
+  -d '{"occasion":"date night","weather":{"temperatureC":32,"humidity":80}}' | jq
+```
+
+Weather comes from Open-Meteo (no key needed), cached per city per hour, with a
+manual override for travel.
+
 ## Status
 
 - [x] **Phase 0** — scaffold, schema, storage, provider-pluggable AI wrapper, smoke test
 - [x] **Phase 1** — ingestion, vision extraction, review screen
-- [ ] **Phase 2** — filtering engine, recommendation call, weather tool
+- [x] **Phase 2** — filtering engine, recommendation call, weather
 - [ ] **Phase 3** — full UI
 - [ ] **Phase 4** — learning loop, insights, eval harness
 

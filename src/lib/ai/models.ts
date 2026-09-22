@@ -24,9 +24,12 @@ export interface TaskConfig {
 const OLLAMA_TASKS: Record<TaskName, TaskConfig> = {
   smoke: { model: "qwen3.5:4b", maxTokens: 512, thinking: false },
   extract_garment: { model: "qwen3.5:4b", maxTokens: 2048, thinking: false },
-  recommend_outfits: { model: "qwen3.5:9b", maxTokens: 4096, thinking: true },
+  // Thinking stays off for every structured local task: the reasoning eats
+  // the token budget before the grammar emits any JSON, turning a 30s call
+  // into a multi-minute one that returns nothing. See OllamaProvider.
+  recommend_outfits: { model: "qwen3.5:9b", maxTokens: 4096, thinking: false },
   learn_preferences: { model: "qwen3.5:9b", maxTokens: 2048, thinking: false },
-  style_review: { model: "qwen3.5:9b", maxTokens: 4096, thinking: true },
+  style_review: { model: "qwen3.5:9b", maxTokens: 4096, thinking: false },
   eval_judge: { model: "qwen3.5:9b", maxTokens: 1024, thinking: false },
 };
 
