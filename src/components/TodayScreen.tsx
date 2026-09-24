@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { OutfitCard, type OutfitView } from "@/components/OutfitCard";
 
@@ -25,12 +25,14 @@ interface WeatherView {
 
 interface Props {
   initialCity: string | null;
+  /** Fetched on the server so the first paint already has a forecast. */
+  initialWeather: WeatherView | null;
 }
 
-export function TodayScreen({ initialCity }: Props) {
+export function TodayScreen({ initialCity, initialWeather }: Props) {
   const [city, setCity] = useState(initialCity ?? "");
   const [cityDraft, setCityDraft] = useState(initialCity ?? "");
-  const [weather, setWeather] = useState<WeatherView | null>(null);
+  const [weather, setWeather] = useState<WeatherView | null>(initialWeather);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [editingWeather, setEditingWeather] = useState(false);
 
@@ -69,19 +71,18 @@ export function TodayScreen({ initialCity }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    if (city) void loadWeather(city);
-  }, [city, loadWeather]);
-
   async function saveCity() {
     const next = cityDraft.trim();
     if (!next) return;
     setCity(next);
-    await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ homeCity: next }),
-    });
+    await Promise.all([
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ homeCity: next }),
+      }),
+      loadWeather(next),
+    ]);
   }
 
   async function suggest() {
@@ -158,9 +159,7 @@ export function TodayScreen({ initialCity }: Props) {
               <p className="text-sm font-medium">
                 {weather
                   ? `${weather.temperatureC}°C, ${weather.description}`
-                  : weatherError
-                    ? "Weather unavailable"
-                    : "Checking the forecast…"}
+                  : (weatherError ?? "Tap refresh for the forecast")}
               </p>
               <p className="mt-0.5 text-xs text-muted">
                 {weather
@@ -168,13 +167,22 @@ export function TodayScreen({ initialCity }: Props) {
                   : (weatherError ?? city)}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setEditingWeather((v) => !v)}
-              className="flex-none text-xs text-muted underline underline-offset-4"
-            >
-              {editingWeather ? "Done" : "Edit"}
-            </button>
+            <div className="flex flex-none gap-3">
+              <button
+                type="button"
+                onClick={() => void loadWeather(city)}
+                className="text-xs text-muted underline underline-offset-4"
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingWeather((v) => !v)}
+                className="text-xs text-muted underline underline-offset-4"
+              >
+                {editingWeather ? "Done" : "Edit"}
+              </button>
+            </div>
           </div>
         )}
 

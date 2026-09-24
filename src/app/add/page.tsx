@@ -6,6 +6,13 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import type { GarmentColor } from "@/lib/garments/attributes";
 
+/**
+ * Reads pending drafts on every request. Without this Next prerenders the page at
+ * build time and serves stale data until the next deploy.
+ */
+export const dynamic = "force-dynamic";
+
+
 /** Anything already extracted but not yet confirmed resumes here. */
 export default async function AddPage() {
   const rows = await prisma.garment.findMany({

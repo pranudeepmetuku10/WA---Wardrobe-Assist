@@ -187,12 +187,29 @@ curl -s localhost:3000/api/recommend -X POST -H 'Content-Type: application/json'
 Weather comes from Open-Meteo (no key needed), cached per city per hour, with a
 manual override for travel.
 
+## Screens
+
+| Route | What it does |
+|---|---|
+| `/` | **Today** — occasion chips, live forecast, free-text override, three outfits |
+| `/wardrobe` | Filterable grid, search, one-tap laundry toggle, inline edit |
+| `/add` | Batch upload, extraction queue, review cards |
+| `/history` | Every outfit suggested and worn, with ratings |
+| `/profile` | Colours, hard rules, notes, and what the app thinks it learned |
+
+Bottom tab bar on a phone, top bar on a desktop, same routes either way.
+Outfit results swipe horizontally on a phone and become a grid at `sm:`.
+
+Pages that read the database are `force-dynamic`. Without it Next prerenders
+them at build time, and a production build serves whatever was in the wardrobe
+the moment you deployed.
+
 ## Status
 
 - [x] **Phase 0** — scaffold, schema, storage, provider-pluggable AI wrapper, smoke test
 - [x] **Phase 1** — ingestion, vision extraction, review screen
 - [x] **Phase 2** — filtering engine, recommendation call, weather
-- [ ] **Phase 3** — full UI
+- [x] **Phase 3** — full UI
 - [ ] **Phase 4** — learning loop, insights, eval harness
 
 Out of scope for v1: shopping recommendations, social sharing, multi-user

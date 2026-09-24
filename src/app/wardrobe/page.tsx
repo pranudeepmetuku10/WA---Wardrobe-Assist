@@ -5,6 +5,13 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import type { GarmentColor } from "@/lib/garments/attributes";
 
+/**
+ * Reads your garments on every request. Without this Next prerenders the page at
+ * build time and serves stale data until the next deploy.
+ */
+export const dynamic = "force-dynamic";
+
+
 export default async function WardrobePage() {
   const rows = await prisma.garment.findMany({
     where: { userId: env.DEFAULT_USER_ID },

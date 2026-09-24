@@ -3,6 +3,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 
+/**
+ * Reads your outfit history on every request. Without this Next prerenders the page at
+ * build time and serves stale data until the next deploy.
+ */
+export const dynamic = "force-dynamic";
+
+
 function formatDate(value: Date | null): string {
   if (!value) return "not worn";
   return value.toLocaleDateString(undefined, {

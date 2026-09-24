@@ -3,6 +3,14 @@ import Link from "next/link";
 import { TodayScreen } from "@/components/TodayScreen";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { forecastForCity } from "@/lib/weather/openMeteo";
+
+/**
+ * Reads the wardrobe count and today's forecast on every request. Without this Next prerenders the page at
+ * build time and serves stale data until the next deploy.
+ */
+export const dynamic = "force-dynamic";
+
 
 /** Home is Today: pick an occasion, get three outfits. */
 export default async function Home() {
@@ -15,6 +23,22 @@ export default async function Home() {
       where: { userId: env.DEFAULT_USER_ID, status: "AVAILABLE" },
     }),
   ]);
+
+  // Forecast on the server: the page arrives with today's weather already on
+  // it, and a failed lookup simply leaves it blank rather than blocking.
+  const forecast = profile?.homeCity
+    ? await forecastForCity(profile.homeCity).catch(() => null)
+    : null;
+
+  const initialWeather = forecast
+    ? {
+        temperatureC: Math.round(forecast.temperatureC),
+        humidity: Math.round(forecast.humidity),
+        precipitationChance: Math.round(forecast.precipitationChance),
+        description: forecast.description,
+        place: forecast.place,
+      }
+    : null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 sm:py-10">
@@ -40,7 +64,10 @@ export default async function Home() {
           </Link>
         </div>
       ) : (
-        <TodayScreen initialCity={profile?.homeCity ?? null} />
+        <TodayScreen
+          initialCity={profile?.homeCity ?? null}
+          initialWeather={initialWeather}
+        />
       )}
     </main>
   );

@@ -2,6 +2,13 @@ import { StyleProfileForm, type ProfileView } from "@/components/StyleProfileFor
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 
+/**
+ * Reads your style profile on every request. Without this Next prerenders the page at
+ * build time and serves stale data until the next deploy.
+ */
+export const dynamic = "force-dynamic";
+
+
 export default async function ProfilePage() {
   const profile = await prisma.styleProfile.upsert({
     where: { userId: env.DEFAULT_USER_ID },
