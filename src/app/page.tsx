@@ -1,48 +1,47 @@
 import Link from "next/link";
 
-/**
- * Placeholder home screen. Phase 3 replaces this with the Today screen
- * (occasion chips, weather, "Suggest outfits").
- *
- * Layout rule for the whole app: narrow layout first, then widen at md/lg.
- * Same URL, same code, usable on a phone and on a desktop browser.
- */
-export default function Home() {
+import { TodayScreen } from "@/components/TodayScreen";
+import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
+
+/** Home is Today: pick an occasion, get three outfits. */
+export default async function Home() {
+  const [profile, wardrobeSize] = await Promise.all([
+    prisma.styleProfile.findUnique({
+      where: { userId: env.DEFAULT_USER_ID },
+      select: { homeCity: true },
+    }),
+    prisma.garment.count({
+      where: { userId: env.DEFAULT_USER_ID, status: "AVAILABLE" },
+    }),
+  ]);
+
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-5 py-10 sm:px-8 sm:py-14">
-      <header className="space-y-1">
+    <main className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 sm:py-10">
+      <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Wardrobe
+          Today
         </h1>
-        <p className="text-sm text-muted sm:text-base">
-          Outfits from the clothes you already own.
+        <p className="mt-1 text-sm text-muted">
+          {wardrobeSize > 0
+            ? `${wardrobeSize} things available to wear.`
+            : "Your wardrobe is empty — add a few things first."}
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium">Build your wardrobe</h2>
-          <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>Photograph a batch, or describe items in words.</li>
-            <li>Everything is read locally — no photos leave this machine.</li>
-          </ul>
+      {wardrobeSize === 0 ? (
+        <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+          <p className="text-sm">Nothing to suggest from yet.</p>
           <Link
             href="/add"
-            className="mt-5 inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-medium text-accent-foreground"
+            className="mt-4 inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-medium text-accent-foreground"
           >
-            Add clothes
+            Add your clothes
           </Link>
         </div>
-
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium">What&rsquo;s coming</h2>
-          <ol className="mt-3 space-y-2 text-sm text-muted">
-            <li>1. Photograph or describe what you own.</li>
-            <li>2. Pick an occasion; the weather fills itself in.</li>
-            <li>3. Get three outfits you can actually wear today.</li>
-          </ol>
-        </div>
-      </section>
+      ) : (
+        <TodayScreen initialCity={profile?.homeCity ?? null} />
+      )}
     </main>
   );
 }
