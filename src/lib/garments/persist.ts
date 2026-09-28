@@ -89,6 +89,7 @@ export async function applyGarmentEdit(id: string, edit: GarmentEdit) {
     data.culturalContext = edit.culturalContext;
   }
   if (edit.brand !== undefined) data.brand = edit.brand;
+  if (edit.priceCents !== undefined) data.priceCents = edit.priceCents;
   if (edit.notes !== undefined) data.notes = edit.notes;
   if (edit.isFavorite !== undefined) data.isFavorite = edit.isFavorite;
   if (edit.isBasic !== undefined) data.isBasic = edit.isBasic;

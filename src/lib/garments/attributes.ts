@@ -164,6 +164,8 @@ export const GarmentEditSchema = z.object({
   styleTags: z.array(z.string()).max(8).optional(),
   culturalContext: z.string().max(80).nullable().optional(),
   brand: z.string().max(60).nullable().optional(),
+  /** What it cost, in cents. Powers cost-per-wear in Insights. */
+  priceCents: z.number().int().min(0).max(100_000_00).nullable().optional(),
   notes: z.string().max(400).nullable().optional(),
   isFavorite: z.boolean().optional(),
   isBasic: z.boolean().optional(),

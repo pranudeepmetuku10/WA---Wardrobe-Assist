@@ -27,6 +27,7 @@ export interface ReviewGarment {
   styleTags: string[];
   aiConfidence: number | null;
   userVerified: boolean;
+  priceCents?: number | null;
 }
 
 interface Props {
@@ -75,6 +76,7 @@ export function GarmentReviewCard({ garment, onSaved, onDeleted }: Props) {
           category: draft.category,
           subcategory: draft.subcategory,
           colors: draft.colors,
+          priceCents: draft.priceCents ?? null,
           pattern: draft.pattern,
           materials: draft.materials,
           formality: draft.formality,
@@ -188,6 +190,30 @@ export function GarmentReviewCard({ garment, onSaved, onDeleted }: Props) {
           selected={draft.materials}
           onToggle={(v) => toggle("materials", v)}
         />
+
+        <label className="flex items-center justify-between gap-3 text-xs text-muted">
+          <span>What it cost (optional)</span>
+          <span className="flex items-center gap-1">
+            <span aria-hidden>$</span>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={
+                draft.priceCents === null || draft.priceCents === undefined
+                  ? ""
+                  : Math.round(draft.priceCents / 100)
+              }
+              onChange={(e) =>
+                set(
+                  "priceCents",
+                  e.target.value === "" ? null : Number(e.target.value) * 100,
+                )
+              }
+              className="h-8 w-20 rounded-lg border border-border bg-background px-2 text-right text-sm text-foreground"
+            />
+          </span>
+        </label>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">Colours</span>

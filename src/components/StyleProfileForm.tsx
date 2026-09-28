@@ -2,6 +2,16 @@
 
 import { useState } from "react";
 
+export interface LearnedView {
+  summary: string;
+  colorsGravitatedTo: string[];
+  colorsAvoidedInPractice: string[];
+  combinationsRejected: string[];
+  formalityByOccasion: Array<{ occasion: string; observation: string }>;
+  neverWorn: string[];
+  confidence: number;
+}
+
 export interface ProfileView {
   homeCity: string | null;
   bodyNotes: string | null;
@@ -21,6 +31,8 @@ export function StyleProfileForm({ initial }: { initial: ProfileView }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newRule, setNewRule] = useState({ a: "", b: "" });
+  const [learning, setLearning] = useState(false);
+  const [learnNote, setLearnNote] = useState<string | null>(null);
 
   function set<K extends keyof ProfileView>(key: K, value: ProfileView[K]) {
     setProfile((current) => ({ ...current, [key]: value }));
@@ -42,6 +54,7 @@ export function StyleProfileForm({ initial }: { initial: ProfileView }) {
           neverPair: profile.neverPair,
           dressCodeNotes: profile.dressCodeNotes,
           freeformPreferences: profile.freeformPreferences,
+          learnedPreferences: profile.learnedPreferences,
           wearRecencyDays: profile.wearRecencyDays,
         }),
       });
@@ -55,7 +68,31 @@ export function StyleProfileForm({ initial }: { initial: ProfileView }) {
     }
   }
 
-  const learned = profile.learnedPreferences;
+  const learned = profile.learnedPreferences as LearnedView | null;
+
+  function setLearned(next: LearnedView) {
+    set("learnedPreferences", next as unknown as ProfileView["learnedPreferences"]);
+  }
+
+  /** Re-reads the wear log and rewrites what the app believes about you. */
+  async function refreshLearned() {
+    setLearning(true);
+    setLearnNote(null);
+    try {
+      const response = await fetch("/api/profile/learn", { method: "POST" });
+      const body = await response.json();
+      if (body.ok && body.preferences) {
+        setLearned(body.preferences);
+        setLearnNote(`Updated from your last ${body.eventsConsidered} pieces of feedback.`);
+      } else {
+        setLearnNote(body.error ?? "Couldn't work anything out from the log yet.");
+      }
+    } catch (cause) {
+      setLearnNote(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLearning(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -192,17 +229,84 @@ export function StyleProfileForm({ initial }: { initial: ProfileView }) {
 
       <Section
         title="What the app thinks it has learned"
-        hint="Inferred from your feedback. Correct it — it is not gospel."
+        hint="Inferred from what you actually wear. Edit anything it got wrong — this text is read back when suggesting outfits."
       >
         {learned ? (
-          <pre className="overflow-x-auto rounded-2xl border border-border bg-surface p-4 text-xs leading-relaxed text-muted">
-            {JSON.stringify(learned, null, 2)}
-          </pre>
+          <div className="space-y-3">
+            <textarea
+              value={learned.summary}
+              onChange={(e) => setLearned({ ...learned, summary: e.target.value })}
+              rows={4}
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed"
+              aria-label="What the app learned about you"
+            />
+
+            <Labelled label="Colours you reach for">
+              <TagInput
+                values={learned.colorsGravitatedTo}
+                onChange={(v) => setLearned({ ...learned, colorsGravitatedTo: v })}
+                placeholder="olive, navy"
+              />
+            </Labelled>
+
+            <Labelled label="Colours you own but skip">
+              <TagInput
+                values={learned.colorsAvoidedInPractice}
+                onChange={(v) =>
+                  setLearned({ ...learned, colorsAvoidedInPractice: v })
+                }
+                placeholder="mustard"
+              />
+            </Labelled>
+
+            {learned.combinationsRejected.length > 0 && (
+              <Labelled label="Combinations you turn down">
+                <TagInput
+                  values={learned.combinationsRejected}
+                  onChange={(v) =>
+                    setLearned({ ...learned, combinationsRejected: v })
+                  }
+                  placeholder=""
+                />
+              </Labelled>
+            )}
+
+            {learned.formalityByOccasion.length > 0 && (
+              <ul className="space-y-1 rounded-2xl border border-border bg-surface p-4 text-xs text-muted">
+                {learned.formalityByOccasion.map((entry, i) => (
+                  <li key={i}>
+                    <span className="capitalize text-foreground">{entry.occasion}</span>
+                    {" — "}
+                    {entry.observation}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="text-xs text-muted">
+              Confidence {Math.round(learned.confidence * 100)}%
+              {profile.learnedPreferencesUpdated
+                ? ` · updated ${new Date(profile.learnedPreferencesUpdated).toLocaleDateString()}`
+                : ""}
+            </p>
+          </div>
         ) : (
           <p className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted">
             Nothing learned yet — wear a few outfits and rate them first.
           </p>
         )}
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={refreshLearned}
+            disabled={learning}
+            className="h-10 rounded-full border border-border px-4 text-sm disabled:opacity-50"
+          >
+            {learning ? "Reading your history…" : "Refresh what you've learned"}
+          </button>
+          {learnNote && <span className="text-xs text-muted">{learnNote}</span>}
+        </div>
       </Section>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

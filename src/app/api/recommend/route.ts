@@ -4,6 +4,8 @@ import { recommend } from "@/lib/recommend/pipeline";
 
 const BodySchema = z.object({
   occasion: z.string().min(1).max(120),
+  /** Only the eval harness sets this; the app always uses the default user. */
+  userId: z.string().max(60).optional(),
   city: z.string().max(80).optional(),
   when: z.coerce.date().optional(),
   timeOfDay: z.string().max(30).optional(),

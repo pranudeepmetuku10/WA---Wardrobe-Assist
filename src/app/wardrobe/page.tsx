@@ -38,6 +38,7 @@ export default async function WardrobePage() {
     wearCount: row.wearCount,
     lastWornAt: row.lastWornAt?.toISOString() ?? null,
     isFavorite: row.isFavorite,
+    priceCents: row.priceCents,
   }));
 
   return (
@@ -49,12 +50,20 @@ export default async function WardrobePage() {
           </h1>
           <p className="mt-1 text-sm text-muted">{items.length} items</p>
         </div>
-        <Link
-          href="/add"
-          className="flex-none rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
-        >
-          Add
-        </Link>
+        <div className="flex flex-none items-center gap-3">
+          <Link
+            href="/insights"
+            className="text-sm text-muted underline underline-offset-4"
+          >
+            Insights
+          </Link>
+          <Link
+            href="/add"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
+          >
+            Add
+          </Link>
+        </div>
       </header>
 
       {items.length === 0 ? (

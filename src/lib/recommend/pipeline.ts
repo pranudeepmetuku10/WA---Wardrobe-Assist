@@ -33,6 +33,11 @@ const MIN_VIABLE = 3;
 
 export interface RecommendRequest {
   occasion: string;
+  /**
+   * Whose wardrobe to read. Defaults to the single local user; the eval
+   * harness passes a fixture user so it never touches real clothes.
+   */
+  userId?: string;
   city?: string;
   when?: Date;
   timeOfDay?: string;
@@ -86,17 +91,16 @@ export async function recommend(
 ): Promise<RecommendResponse> {
   const now = request.when ?? new Date();
   const occasion = resolveOccasion(request.occasion);
+  const userId = request.userId ?? env.DEFAULT_USER_ID;
 
   const profile = await prisma.styleProfile.findUnique({
-    where: { userId: env.DEFAULT_USER_ID },
+    where: { userId },
   });
 
   const weather = await resolveWeather(request, profile?.homeCity ?? null, now);
   const season = seasonForDate(now, weather.monsoonRegion);
 
-  const rows = await prisma.garment.findMany({
-    where: { userId: env.DEFAULT_USER_ID },
-  });
+  const rows = await prisma.garment.findMany({ where: { userId } });
 
   const candidates: CandidateGarment[] = rows.map((row) => ({
     id: row.id,
@@ -251,7 +255,7 @@ export async function recommend(
   });
 
   if (request.persist !== false) {
-    await persistOutfits(outfits, request, occasion, weather, relaxed);
+    await persistOutfits(outfits, request, occasion, weather, relaxed, userId);
   }
 
   return {
@@ -377,11 +381,12 @@ async function persistOutfits(
   occasion: OccasionRule,
   weather: ResolvedWeather,
   relaxed: Relaxation[],
+  userId: string,
 ) {
   for (const outfit of outfits) {
     const created = await prisma.outfit.create({
       data: {
-        userId: env.DEFAULT_USER_ID,
+        userId,
         name: outfit.title,
         occasion: request.occasion,
         weatherSnapshot: {
