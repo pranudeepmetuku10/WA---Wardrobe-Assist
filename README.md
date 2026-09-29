@@ -15,6 +15,8 @@ Mobile-first (designed at ~390px), installable as a PWA, single user, local.
 | AI | Pluggable. **Local (Ollama + qwen3.5) by default** — free, private, no rate limits. Anthropic (Haiku 4.5 / Sonnet 5 / Opus 5) is a one-line switch |
 | Images | Local `./uploads` behind `src/lib/storage.ts` (S3/R2 drops in later) |
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how it is put together and why.
+
 ## Setup
 
 ```bash
