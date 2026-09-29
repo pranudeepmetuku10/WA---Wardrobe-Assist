@@ -1,9 +1,15 @@
 import { refreshLearnedPreferences } from "@/lib/ai/learn";
 
 /** POST /api/profile/learn — the "refresh my profile" button. */
-export async function POST() {
+export async function POST(request: Request) {
+  // Only the eval harness passes a user; the app always uses the default.
+  const userId =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : (new URL(request.url).searchParams.get("userId") ?? undefined);
+
   try {
-    const outcome = await refreshLearnedPreferences();
+    const outcome = await refreshLearnedPreferences(userId);
     return Response.json(
       {
         ok: Boolean(outcome.preferences),

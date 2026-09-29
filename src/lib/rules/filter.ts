@@ -164,7 +164,7 @@ function scoreGarment(
 
 /** True when the garment is physically unsuited to the temperature. */
 export function isWrongForWeather(
-  garment: Pick<CandidateGarment, "warmth">,
+  garment: Pick<CandidateGarment, "warmth" | "category">,
   weather: WeatherConditions,
 ): boolean {
   // Indoors, the outside temperature matters much less.
@@ -172,14 +172,28 @@ export function isWrongForWeather(
 
   const target = targetWarmth(weather.temperatureC);
 
-  // Too warm for real heat.
+  // Too warm for real heat. This applies to everything: no amount of layering
+  // makes a wool coat right at 34C.
   if (weather.temperatureC >= 28 && garment.warmth >= target + WARMTH_VETO_GAP) {
     return true;
   }
-  // Too thin for real cold.
-  if (weather.temperatureC <= 5 && garment.warmth <= target - WARMTH_VETO_GAP) {
+
+  // Too thin for real cold — but only for the layer that carries the warmth.
+  //
+  // Applying this to every garment was a bug the eval caught: at 2C it vetoed
+  // every shirt, every pair of trousers and all nine pairs of shoes (no shoe
+  // is rated above warmth 3), leaving nothing to build with. You do not stay
+  // warm through your shoes; you stay warm by layering, and a warmth-2 oxford
+  // under a warmth-5 overcoat is exactly right. Requiring that outer layer is
+  // `needsOuterwear`'s job, not this one.
+  if (
+    weather.temperatureC <= 5 &&
+    garment.category === "OUTERWEAR" &&
+    garment.warmth <= target - WARMTH_VETO_GAP
+  ) {
     return true;
   }
+
   return false;
 }
 
@@ -195,6 +209,24 @@ function wornWithin(
 
 function bump(map: Map<RejectionReason, number>, reason: RejectionReason) {
   map.set(reason, (map.get(reason) ?? 0) + 1);
+}
+
+/**
+ * The season the clothes should answer to.
+ *
+ * The calendar is only a proxy for the weather, and we have the weather. When
+ * the two disagree — a 2C snap in September, a 30C day in March — the
+ * temperature wins. The eval caught this: winter coats were filtered out as
+ * "out of season" on a 2C day, leaving nothing warm to wear.
+ */
+export function seasonForConditions(
+  date: Date,
+  temperatureC: number,
+  monsoon = false,
+): Season {
+  if (temperatureC <= 10) return "WINTER";
+  if (temperatureC >= 28) return monsoon ? "MONSOON" : "SUMMER";
+  return seasonForDate(date, monsoon);
 }
 
 /** Northern-hemisphere-ish default; India's monsoon months matter here too. */

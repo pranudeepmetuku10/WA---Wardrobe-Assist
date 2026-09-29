@@ -4,6 +4,7 @@ import { buildCombinations, type CombinableGarment } from "@/lib/rules/combine";
 import {
   filterGarments,
   isWrongForWeather,
+  seasonForConditions,
   seasonForDate,
   type CandidateGarment,
   type FilterContext,
@@ -151,20 +152,55 @@ describe("weather veto", () => {
     expect(isWrongForWeather(chinos, HOT)).toBe(false);
   });
 
-  it("vetoes a summer shirt in freezing weather", () => {
-    const freezing = { temperatureC: 1, humidity: 70, precipitationChance: 20 };
-    expect(isWrongForWeather({ warmth: 1 }, freezing)).toBe(true);
-    expect(isWrongForWeather({ warmth: 5 }, freezing)).toBe(false);
+  const FREEZING = { temperatureC: 1, humidity: 70, precipitationChance: 20 };
+
+  it("vetoes a flimsy outer layer in freezing weather", () => {
+    expect(
+      isWrongForWeather({ warmth: 1, category: "OUTERWEAR" }, FREEZING),
+    ).toBe(true);
+    expect(
+      isWrongForWeather({ warmth: 5, category: "OUTERWEAR" }, FREEZING),
+    ).toBe(false);
+  });
+
+  it("keeps thin base layers and normal shoes in the cold", () => {
+    // The eval found this: vetoing every thin garment at 2C left no shirts,
+    // no trousers and no shoes at all, so no outfit could be built. Warmth in
+    // the cold comes from the outer layer, not the shirt or the shoes.
+    expect(isWrongForWeather({ warmth: 2, category: "TOP" }, FREEZING)).toBe(false);
+    expect(isWrongForWeather({ warmth: 2, category: "BOTTOM" }, FREEZING)).toBe(false);
+    expect(isWrongForWeather({ warmth: 3, category: "FOOTWEAR" }, FREEZING)).toBe(false);
   });
 
   it("ignores the outside temperature indoors", () => {
-    expect(isWrongForWeather({ warmth: 4 }, { ...HOT, indoor: true })).toBe(false);
+    expect(
+      isWrongForWeather({ warmth: 4, category: "TOP" }, { ...HOT, indoor: true }),
+    ).toBe(false);
   });
 
   it("does nothing in mild weather", () => {
     const mild = { temperatureC: 20, humidity: 50, precipitationChance: 0 };
-    expect(isWrongForWeather({ warmth: 1 }, mild)).toBe(false);
-    expect(isWrongForWeather({ warmth: 5 }, mild)).toBe(false);
+    expect(isWrongForWeather({ warmth: 1, category: "TOP" }, mild)).toBe(false);
+    expect(isWrongForWeather({ warmth: 5, category: "OUTERWEAR" }, mild)).toBe(false);
+  });
+
+  it("still builds a complete outfit at 2C", () => {
+    // Regression guard for the zero-outfit failure the eval caught.
+    const winter = {
+      occasion: resolveOccasion("work"),
+      weather: { temperatureC: 2, humidity: 70, precipitationChance: 20 },
+      season: "WINTER" as const,
+      recencyDays: 7,
+      now: NOW,
+    };
+    const wardrobe = [
+      garment({ id: "shirt", category: "TOP", warmth: 2 }),
+      garment({ id: "trousers", category: "BOTTOM", warmth: 3 }),
+      garment({ id: "boots", category: "FOOTWEAR", warmth: 3 }),
+      garment({ id: "coat", category: "OUTERWEAR", warmth: 5 }),
+    ];
+    const kept = filterGarments(wardrobe, winter).kept.map((k) => k.garment.id);
+    expect(kept.sort()).toEqual(["boots", "coat", "shirt", "trousers"]);
   });
 
   it("is not undone by the relaxation ladder", () => {
@@ -175,6 +211,27 @@ describe("weather veto", () => {
     );
     // Relaxing constraints must never produce a physically wrong suggestion.
     expect(relaxed.kept).toHaveLength(0);
+  });
+});
+
+describe("seasonForConditions", () => {
+  it("lets a cold snap override the calendar", () => {
+    // The eval failure: winter coats filtered as "out of season" on a 2C day
+    // in September, leaving nothing warm enough to wear.
+    expect(seasonForConditions(new Date("2026-09-28"), 2)).toBe("WINTER");
+  });
+
+  it("lets an early heatwave override the calendar", () => {
+    expect(seasonForConditions(new Date("2026-03-15"), 32)).toBe("SUMMER");
+  });
+
+  it("uses the monsoon season in monsoon regions when hot", () => {
+    expect(seasonForConditions(new Date("2026-07-10"), 32, true)).toBe("MONSOON");
+  });
+
+  it("defers to the calendar at ordinary temperatures", () => {
+    expect(seasonForConditions(new Date("2026-07-10"), 22)).toBe("SUMMER");
+    expect(seasonForConditions(new Date("2026-01-10"), 18)).toBe("WINTER");
   });
 });
 
@@ -256,6 +313,23 @@ describe("buildCombinations", () => {
       weather: { temperatureC: 3, humidity: 60, precipitationChance: 10 },
     });
     expect(cold.combinations.every((c) => Boolean(c.slots.outerwear))).toBe(true);
+  });
+
+  it("refuses to build a bare outfit when a coat is required", () => {
+    // Worse than returning nothing: the eval produced shirt-and-trousers
+    // at -4C because every warm layer had been filtered out upstream.
+    const freezing = { temperatureC: -4, humidity: 70, precipitationChance: 10 };
+    const result = buildCombinations(wardrobe, { weather: freezing });
+    expect(result.combinations).toHaveLength(0);
+    expect(result.missingSlots).toContain("outerwear");
+  });
+
+  it("builds normally when a warm layer is available", () => {
+    const freezing = { temperatureC: -4, humidity: 70, precipitationChance: 10 };
+    const withCoat = [...wardrobe, combinable("coat", "OUTERWEAR", "#1b2631")];
+    const result = buildCombinations(withCoat, { weather: freezing });
+    expect(result.combinations.length).toBeGreaterThan(0);
+    expect(result.combinations.every((c) => Boolean(c.slots.outerwear))).toBe(true);
   });
 
   it("reports missing slots instead of half an outfit", () => {

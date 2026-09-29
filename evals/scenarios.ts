@@ -196,7 +196,10 @@ export const SCENARIOS: Scenario[] = [
     occasion: "beach day",
     weather: { temperatureC: 33, humidity: 70 },
     indoorOutdoor: "outdoor",
-    checks: [forbidMaterial("nothing-heavy", ["WOOL", "DOWN", "FLEECE", "LEATHER"], "wrong for a beach at 33C")],
+    checks: [
+      forbidMaterial("nothing-heavy", ["WOOL", "DOWN", "FLEECE"], "wrong for a beach at 33C"),
+      forbid("no-heels-at-beach", /heeled/i, "heels on sand"),
+    ],
     rubric: "Light, breathable, sun-appropriate. Sandals over closed leather shoes.",
   },
   {

@@ -204,6 +204,72 @@ Pages that read the database are `force-dynamic`. Without it Next prerenders
 them at build time, and a production build serves whatever was in the wardrobe
 the moment you deployed.
 
+## Learning loop
+
+Every *Wear this*, skip and rating writes a `FeedbackEvent`. **Refresh what
+you've learned** on the Style screen reads the last 50 of them and rewrites
+what the app believes about your taste.
+
+The result is shown as **editable text**, not a read-only summary. If it infers
+something wrong, change it — the corrected version is what gets read back when
+suggesting outfits. Preferences that quietly steer suggestions without being
+visible are worse than no preferences at all.
+
+## Evals
+
+```bash
+npm run dev            # the harness drives the real HTTP API
+npm run eval           # 25 scenarios, rules + LLM judge
+npm run eval -- --no-judge            # rules only, much faster
+npm run eval -- --only=<scenario-id>  # one scenario
+```
+
+- **64 fixture garments** under their own user id, so evals never touch your
+  real wardrobe. Shaped like a real one, gaps included — there is no black tie
+  in it, deliberately.
+- **25 scenarios** crossing occasion, weather and constraints (laundry day,
+  recently worn, explicit requests, and one case where the honest answer is
+  "no outfit can be built").
+- **Deterministic checks** for the things that are simply wrong: wool above
+  28C, shorts at the office, suede in the rain, footwear formality more than
+  one step from the top, a dress paired with trousers, anything in the laundry.
+- **An LLM judge** scores the reasoning 1-5 against each scenario's rubric.
+  Rules and judgement are reported separately, because they fail for different
+  reasons: rules catch bugs, the judge catches blandness.
+- Reports pass rate, failures grouped by rule, median and p90 latency, and cost.
+
+Exit code is non-zero when any scenario fails, so it can gate a commit. If the
+model provider stops answering mid-run the harness aborts rather than recording
+twenty identical failures.
+
+### Where it currently stands (local, qwen3.5:9b)
+
+| | Result |
+|---|---|
+| Deterministic rules | **838 / 844 (99.3%)** |
+| Scenarios fully passing | 12 / 25 (48%) |
+| Judge mean | 2.79 / 5 |
+| Latency | median 58s, p90 64s |
+| Cost | $0 |
+
+Read those two top rows as separate things, because they measure separate
+things. **Outfit construction is essentially solved**: every rule about what
+may be worn together — layers below 10C, no wool above 28C, footwear formality,
+no dress with trousers, nothing from the laundry — now passes. All six
+remaining rule failures are `reasoning_is_specific`, i.e. the model wrote
+something generic.
+
+**The reasoning is the weak half.** A mean judge score of 2.79 means the
+suggestions are defensible but the explanations often are not: they restate the
+occasion instead of engaging with it, and occasionally assert something the
+outfit contradicts. This is a 9B model running on a laptop, and it is the
+strongest argument for switching `AI_PROVIDER` to `anthropic` — the filtering
+would not change at all, only the writing.
+
+**Treat small pass-rate moves as noise.** The judge is itself a 9B model and is
+not self-consistent: across runs of identical code, one scenario scored 2, then
+5, then 3. The deterministic rule count is the number to trust.
+
 ## Status
 
 - [x] **Phase 0** — scaffold, schema, storage, provider-pluggable AI wrapper, smoke test

@@ -54,6 +54,7 @@ async function main() {
   }
 
   await assertServerUp();
+  await assertModelReachable();
   const seeded = await seedFixtures();
   await clearFixtureOutfits();
   console.log(
@@ -62,6 +63,7 @@ async function main() {
 
   const knownIds = new Set(FIXTURE_WARDROBE.map((g) => g.id));
   const results: ScenarioResult[] = [];
+  let consecutiveInfraFailures = 0;
 
   for (const [index, scenario] of scenarios.entries()) {
     process.stdout.write(
@@ -70,6 +72,24 @@ async function main() {
     const result = await runScenario(scenario, knownIds, noJudge);
     results.push(result);
     console.log(summariseLine(result));
+
+    // A dead model daemon fails every remaining scenario for the same reason.
+    // Reporting that as 22 rule failures is worse than useless — it buries the
+    // one fact that matters and wastes twenty minutes doing it.
+    consecutiveInfraFailures = isInfrastructureFailure(result)
+      ? consecutiveInfraFailures + 1
+      : 0;
+    if (consecutiveInfraFailures >= 2) {
+      console.error(
+        `\nAborting: the model provider stopped responding.\n` +
+          `  ${infraReason(result)}\n\n` +
+          `Ollama can be killed by memory pressure on a 16GB machine. Restart it\n` +
+          `and re-run:\n  ollama serve\n`,
+      );
+      await prisma.$disconnect();
+      process.exitCode = 1;
+      return;
+    }
   }
 
   report(results, noJudge);
@@ -327,6 +347,43 @@ async function assertServerUp() {
   } catch {
     console.error(
       `\nCannot reach ${BASE_URL}. Start the app first:\n  npm run dev\n`,
+    );
+    process.exit(1);
+  }
+}
+
+/** Did this scenario fail because the provider was unreachable? */
+function isInfrastructureFailure(result: ScenarioResult): boolean {
+  const text = [result.skipped ?? "", ...result.failures.map((f) => f.detail)]
+    .join(" ")
+    .toLowerCase();
+  return (
+    text.includes("could not reach ollama") ||
+    text.includes("fetch failed") ||
+    text.includes("econnrefused")
+  );
+}
+
+function infraReason(result: ScenarioResult): string {
+  return (
+    result.failures[0]?.detail ?? result.skipped ?? "provider unreachable"
+  );
+}
+
+/** Fail fast if the model provider is down before burning twenty minutes. */
+async function assertModelReachable() {
+  try {
+    const response = await fetch(`${BASE_URL}/api/smoke`, {
+      signal: AbortSignal.timeout(120_000),
+    });
+    const body = await response.json();
+    if (!body.ok) throw new Error(body.error ?? "smoke test failed");
+    console.log(`model ready: ${body.provider}/${body.model}`);
+  } catch (error) {
+    console.error(
+      `\nThe model provider is not answering:\n  ${
+        error instanceof Error ? error.message : String(error)
+      }\n\nFor local runs, check Ollama is up:  ollama serve\n`,
     );
     process.exit(1);
   }

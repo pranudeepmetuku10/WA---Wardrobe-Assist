@@ -1,10 +1,20 @@
 import "server-only";
 
-import { z } from "zod";
-
 import { callModel } from "@/lib/ai/call";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import {
+  LearnedPreferencesSchema,
+  tidyPreferences,
+  type LearnedPreferences,
+} from "@/lib/learning/preferences";
+
+export type { LearnedPreferences } from "@/lib/learning/preferences";
+export {
+  LearnedPreferencesSchema,
+  calibrateConfidence,
+  tidyPreferences,
+} from "@/lib/learning/preferences";
 
 /**
  * Turns the wear log into a picture of the person's taste.
@@ -24,25 +34,6 @@ Return honest observations only. Rules:
 - Write "summary" as two or three plain sentences addressed to the person ("You reach for..."). This is shown to them directly, so no jargon and no flattery.
 - Prefer specific nouns from the log over general fashion language.`;
 
-export const LearnedPreferencesSchema = z.object({
-  summary: z
-    .string()
-    .describe("Two or three plain sentences the person will read and edit"),
-  colorsGravitatedTo: z.array(z.string()).max(6),
-  colorsAvoidedInPractice: z.array(z.string()).max(6),
-  combinationsRejected: z.array(z.string()).max(5),
-  formalityByOccasion: z
-    .array(z.object({ occasion: z.string(), observation: z.string() }))
-    .max(6),
-  neverWorn: z.array(z.string()).max(8),
-  confidence: z
-    .number()
-    .min(0)
-    .max(1)
-    .describe("How much the log actually supports these claims"),
-});
-export type LearnedPreferences = z.infer<typeof LearnedPreferencesSchema>;
-
 export interface LearnOutcome {
   preferences: LearnedPreferences | null;
   eventsConsidered: number;
@@ -55,9 +46,12 @@ export interface LearnOutcome {
 const MIN_EVENTS = 5;
 const EVENT_WINDOW = 50;
 
-export async function refreshLearnedPreferences(): Promise<LearnOutcome> {
+export async function refreshLearnedPreferences(
+  /** Defaults to the single local user; the eval harness passes a fixture. */
+  userId: string = env.DEFAULT_USER_ID,
+): Promise<LearnOutcome> {
   const events = await prisma.feedbackEvent.findMany({
-    where: { userId: env.DEFAULT_USER_ID },
+    where: { userId },
     orderBy: { createdAt: "desc" },
     take: EVENT_WINDOW,
     include: { outfit: { include: { garments: { include: { garment: true } } } } },
@@ -74,7 +68,7 @@ export async function refreshLearnedPreferences(): Promise<LearnOutcome> {
   }
 
   const garments = await prisma.garment.findMany({
-    where: { userId: env.DEFAULT_USER_ID },
+    where: { userId },
     select: { subcategory: true, wearCount: true, createdAt: true },
   });
 
@@ -132,18 +126,22 @@ export async function refreshLearnedPreferences(): Promise<LearnOutcome> {
     };
   }
 
-  if (result.data) {
+  const preferences = result.data
+    ? tidyPreferences(result.data, events.length)
+    : null;
+
+  if (preferences) {
     await prisma.styleProfile.update({
-      where: { userId: env.DEFAULT_USER_ID },
+      where: { userId },
       data: {
-        learnedPreferences: result.data as never,
+        learnedPreferences: preferences as never,
         learnedPreferencesUpdated: new Date(),
       },
     });
   }
 
   return {
-    preferences: result.data,
+    preferences,
     eventsConsidered: events.length,
     latencyMs: result.latencyMs,
     costUsd: result.costUsd,

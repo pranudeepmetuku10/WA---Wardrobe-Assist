@@ -44,6 +44,11 @@ const BREATHABILITY: Partial<Record<Material, number>> = {
   DOWN: 0.05,
 };
 
+/** Woven or coated materials that actually block wind. */
+const WIND_RESISTANT: Material[] = ["NYLON", "POLYESTER", "CANVAS", "LEATHER", "DOWN", "SYNTHETIC"];
+/** Open structures the wind goes straight through. */
+const WIND_POROUS: Material[] = ["KNIT", "LINEN", "CHIFFON"];
+
 /** Materials that suffer in rain. */
 const RAIN_VULNERABLE: Material[] = ["SUEDE", "SILK", "LINEN", "CHIFFON", "SATIN"];
 const RAIN_RESISTANT: Material[] = ["RUBBER", "NYLON", "POLYESTER", "SYNTHETIC", "LEATHER"];
@@ -114,11 +119,27 @@ export function weatherScore(
     }
   }
 
+  // In real wind, what the layer is made of matters: a woven shell blocks it,
+  // an open knit does not, however warm the knit is.
   if ((weather.windKph ?? 0) >= 30 && garment.category === "OUTERWEAR") {
-    score += 0.05;
+    const windproof = garment.materials.some((m) => WIND_RESISTANT.includes(m));
+    const porous = garment.materials.some((m) => WIND_POROUS.includes(m));
+    score += windproof ? 0.15 : porous ? -0.2 : 0.05;
   }
 
   return Math.min(1, Math.max(0, score));
+}
+
+/**
+ * Weather in which going out without a layer is not an option.
+ *
+ * Distinct from `needsOuterwear`, which merely prefers one: at 16C a bare
+ * outfit is a choice, at 2C it is a mistake. When nothing in the wardrobe can
+ * fill this, the honest answer is to say so rather than suggest a shirt.
+ */
+export function requiresOuterwear(weather: WeatherConditions): boolean {
+  if (weather.indoor) return false;
+  return weather.temperatureC <= 10 || weather.precipitationChance >= 70;
 }
 
 /** Does the weather call for a layer at all? */

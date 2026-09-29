@@ -4,6 +4,7 @@ import type { ScoredGarment } from "@/lib/rules/filter";
 import {
   needsOuterwear,
   rejectsOuterwear,
+  requiresOuterwear,
   type WeatherConditions,
 } from "@/lib/rules/weather";
 
@@ -83,9 +84,19 @@ export function buildCombinations(
   if (!tops.length && !onePieces.length) missingSlots.push("top");
   if (!bottoms.length && !onePieces.length) missingSlots.push("bottom");
 
+  // Below 10C a coat is not optional. Returning bare outfits here is worse
+  // than returning none: the eval produced shirt-and-trousers at -4C because
+  // every warm layer had been filtered out upstream.
+  const layerRequired = requiresOuterwear(options.weather);
+  if (layerRequired && !outerwear.length) missingSlots.push("outerwear");
+
   // Without shoes, or without something to cover top and bottom, there is no
   // outfit to build — say so rather than returning half an outfit.
-  if (!footwear.length || (!onePieces.length && (!tops.length || !bottoms.length))) {
+  if (
+    !footwear.length ||
+    (!onePieces.length && (!tops.length || !bottoms.length)) ||
+    (layerRequired && !outerwear.length)
+  ) {
     return { combinations: [], missingSlots, generated: 0 };
   }
 

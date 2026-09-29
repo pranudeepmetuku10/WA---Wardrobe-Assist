@@ -7,7 +7,7 @@ import type { GarmentColor } from "@/lib/garments/attributes";
 import { buildCombinations, type CombinableGarment } from "@/lib/rules/combine";
 import {
   filterGarments,
-  seasonForDate,
+  seasonForConditions,
   type CandidateGarment,
   type Relaxation,
 } from "@/lib/rules/filter";
@@ -98,7 +98,11 @@ export async function recommend(
   });
 
   const weather = await resolveWeather(request, profile?.homeCity ?? null, now);
-  const season = seasonForDate(now, weather.monsoonRegion);
+  const season = seasonForConditions(
+    now,
+    weather.conditions.temperatureC,
+    weather.monsoonRegion,
+  );
 
   const rows = await prisma.garment.findMany({ where: { userId } });
 
@@ -348,7 +352,12 @@ async function resolveWeather(
 
 function gapFromMissingSlots(missing: string[]): Recommendation["gap"] {
   if (!missing.length) return null;
-  const item = missing[0] === "footwear" ? "a pair of shoes" : `a ${missing[0]}`;
+  const item =
+    missing[0] === "footwear"
+      ? "a pair of shoes"
+      : missing[0] === "outerwear"
+        ? "a warm coat"
+        : `a ${missing[0]}`;
   return {
     item,
     why: `Nothing in your wardrobe fills the ${missing.join(" or ")} slot for this occasion, so no complete outfit can be built.`,

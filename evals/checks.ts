@@ -136,16 +136,17 @@ export const UNIVERSAL_CHECKS: Check[] = [
     },
   },
   {
-    id: "nothing_too_thin_when_freezing",
-    describe: "nothing rated warmth 1 below 5C",
+    id: "warm_layer_when_freezing",
+    describe: "a genuinely warm outer layer below 5C",
     run: (outfit, ctx) => {
       if (ctx.temperatureC > 5) return null;
-      const thin = outfit.garments.filter(
-        (g) => g.warmth === 1 && g.category !== "ACCESSORY" && g.category !== "BAG",
-      );
-      return thin.length
-        ? `${thin.map((g) => g.subcategory).join(", ")} at ${ctx.temperatureC}C`
-        : null;
+      // A thin base layer under a heavy coat is correct, so the outer layer is
+      // what this checks — not every garment in the outfit.
+      const layer = outfit.garments.find((g) => g.category === "OUTERWEAR");
+      if (!layer) return `no outer layer at ${ctx.temperatureC}C`;
+      return layer.warmth >= 4
+        ? null
+        : `${layer.subcategory} (warmth ${layer.warmth}) is too light for ${ctx.temperatureC}C`;
     },
   },
   {
